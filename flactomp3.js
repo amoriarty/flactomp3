@@ -1,6 +1,6 @@
 var fs = require('fs');
 var path = require('path');
-var exec = require('child_process');
+var exec = require('child_process').execSync;
 var inputDir = process.argv[2] || null;
 var outputDir = process.argv[3] || null;
 var i = 0;
@@ -42,29 +42,14 @@ var getPathArray = function (inputPath) {
 }
 
 /**
- * Callback function to child_process.exec.
- * @param {*} err 
- * @param {*} stdout 
- * @param {*} stderr 
- */
-var execute = function (err, stdout, stderr) {
-	var matches = stderr.match(/Error/mig);
-
-	i++;
-	if (!matches) return ;
-	matches = stderr.match(/\/.*\.mp3/gm);
-	fs.unlinkSync(matches[0]);
-}
-
-/**
  * Callback pass to for each function, use on pathArray.
  * @param {string} value 
  * @param {number} index 
  */
 var fileLoop = function (value, index) {
 	var command;
-	var result;
 	var mp3;
+	var result;
 
 	/* mp3 path string creation */
 	mp3 = value
@@ -72,10 +57,7 @@ var fileLoop = function (value, index) {
 	.replace(/^(\/.*)\//g, outputDir + '/');
 
 	/* Return if file already exists. */
-	if (fs.existsSync(mp3)) {
-		i++;
-		return ;
-	}
+	if (fs.existsSync(mp3)) fs.unlink(mp3);
 
 	/* Command creation */
 	command = "ffmpeg -i ";
@@ -84,7 +66,20 @@ var fileLoop = function (value, index) {
 	command	+= mp3.replace(/(["\s'$`\\\(\)&])/g,'\\$1');
 
 	/* Process */
-	result = exec.exec(command, { encoding: "utf8" }, execute);
+	console.log("Convert", value);
+	result = exec(command, {
+		encoding: "utf8",
+		stdio: [ process.stdin, result, result ]
+	});
+
+	/* Check for errors, and if true unlink created file. */
+	if (result.match(/\/.*\.mp3/gm)) {
+		fs.unlink(mp3);
+		console.error("Error while processing, output file have been deleted.");
+	}
+
+	/* Upgrade i for process loop */
+	i++;
 }
 
 /**
@@ -108,6 +103,7 @@ if (!inputDir || !outputDir) {
 pathArray = getPathArray(inputDir);
 
 /* Execute ffmpeg for all files */
+console.log(pathArray.length.toString(), "files to process ...");
 pathArray.forEach(fileLoop);
 
 /* Check if process has finish and exit. */
