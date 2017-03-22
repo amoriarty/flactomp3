@@ -9,6 +9,7 @@ var pathArray;
 /**
  * Check if input string finish by flac.
  * @param {string} input 
+ * @return {boolean}
  */
 var checkFlac = function (input) {
 	return (input.match(/\.flac$/)) ? true : false;
